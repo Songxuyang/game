@@ -423,12 +423,65 @@ function selectSkin(id) {
   if (skinPanelOpen) buildSkinPanel();
   return true;
 }
-function drawSkinPreview(context, skin, x, y, size) {
-  context.fillStyle = skin.playerFill;
-  context.fillRect(x, y, size, size);
+// 小人的绘制始终限制在原来的方形碰撞范围内。
+function drawCharacter(context, skin, x, y, size, direction = 1) {
+  context.save();
+  context.translate(x + size / 2, y + size / 2);
+  if (direction === -1) context.rotate(Math.PI);
+  context.scale(size / PLAYER_SIZE, size / PLAYER_SIZE);
+  context.translate(-PLAYER_SIZE / 2, -PLAYER_SIZE / 2);
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+
+  // 四肢用两层线条描边，让不同皮肤下的轮廓仍然清晰。
+  const limbs = () => {
+    context.beginPath();
+    context.moveTo(9, 16); context.lineTo(5, 20);
+    context.moveTo(19, 16); context.lineTo(23, 20);
+    context.moveTo(11, 20); context.lineTo(9, 25);
+    context.moveTo(17, 20); context.lineTo(19, 25);
+    context.stroke();
+  };
   context.strokeStyle = skin.playerStroke;
-  context.lineWidth = 2;
-  context.strokeRect(x + 1, y + 1, size - 2, size - 2);
+  context.lineWidth = 6;
+  limbs();
+  context.strokeStyle = skin.playerFill;
+  context.lineWidth = 3.5;
+  limbs();
+
+  context.fillStyle = skin.playerFill;
+  context.strokeStyle = skin.playerStroke;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(11, 13);
+  context.lineTo(17, 13);
+  context.quadraticCurveTo(20, 13, 20, 16);
+  context.lineTo(19, 21);
+  context.lineTo(9, 21);
+  context.lineTo(8, 16);
+  context.quadraticCurveTo(8, 13, 11, 13);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  context.beginPath();
+  context.arc(14, 7, 6, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.fillStyle = '#111827';
+  for (const eyeX of [12, 16]) {
+    context.beginPath(); context.arc(eyeX, 6.5, 0.8, 0, Math.PI * 2); context.fill();
+  }
+  context.strokeStyle = '#111827';
+  context.lineWidth = 0.8;
+  context.beginPath(); context.arc(14, 8.5, 1.5, 0.15, Math.PI - 0.15); context.stroke();
+  context.restore();
+}
+function drawSkinPreview(context, skin, x, y, size) {
+  drawCharacter(context, skin, x, y, size);
+}
+function drawPlayer() {
+  drawCharacter(ctx, getCurrentSkin(), player.x, player.y, PLAYER_SIZE, gravityDir);
 }
 function buildSkinPanel() {
   document.getElementById('skin-wallet').textContent = '金币: ' + wallet;
@@ -986,7 +1039,7 @@ function draw() {
   }
   for (const coin of coins) drawCoinEffects(coin);
   drawPlayerGlow();
-  drawSkinPreview(ctx, skin, player.x, player.y, PLAYER_SIZE);
+  drawPlayer();
   drawShockwaves();
   drawParticles();
   ctx.textBaseline = 'top';
