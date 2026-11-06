@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>重力翻转小人 MVP v1.0</title>
+<title>重力翻转小人 MVP v1.1</title>
 <style>
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
@@ -20,16 +20,20 @@ const W = 480, H = 720;
 const PLAYER_SIZE = 28, PLAYER_X = 120, PLAYER_INITIAL_Y = 120;
 const GRAVITY = 1600, MAX_VY = 650, FLIP_IMPULSE = 200;
 const PLATFORM_H = 18, PLATFORM_MIN_W = 140, PLATFORM_MAX_W = 240;
-const BASE_SPEED = 140, SPEED_PER_SCORE = 6, MAX_SPEED = 300;
+const BASE_SPEED = 140, SPEED_PER_SCORE = 6, MAX_SPEED = 340;
 const PLATFORM_MIN_Y = 80, PLATFORM_MAX_Y = H - 80 - PLATFORM_H;
 const MAX_VERTICAL_DELTA = 260, MIN_GAP = 180, MAX_GAP = 300;
 const COLLISION_TOLERANCE = 8, MAX_DT = 0.033;
+const COIN_RADIUS = 10, COIN_CHANCE = 0.6, COIN_SPEED_FACTOR = 0.85;
+const COMBO_TIMEOUT = 4, PARTICLE_GRAVITY = 400;
 const BEST_KEY = 'gravity_flip_best';
 const READY = 'READY', PLAYING = 'PLAYING', GAME_OVER = 'GAME_OVER';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let state = READY, player, platforms, standingPlatform;
 let gravityDir = 1, score = 0, best = 0, nextGap = 0;
+let coins = [], particles = [];
+let combo = 0, maxCombo = 0, lastScoreTime = 0, gameTime = 0;
 let lastTime = null, lastTouchTime = -Infinity;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const random = (min, max) => min + Math.random() * (max - min);
@@ -37,6 +41,12 @@ try {
   const saved = Number(localStorage.getItem(BEST_KEY));
   if (Number.isSafeInteger(saved) && saved >= 0) best = saved;
 } catch (_) { /* 存储不可用时仍可正常游戏。 */ }
+
+const lerp = (a, b, t) => a + (b - a) * t;
+function getDifficulty() { return Math.min(score / 30, 1); }
+function getNextGap() {
+  return lerp(random(MIN_GAP, MAX_GAP), random(140, 240), getDifficulty());
+}
 
 function updateBest() {
   if (score <= best) return;
@@ -49,23 +59,109 @@ function resetGame() {
   gravityDir = 1;
   standingPlatform = null;
   score = 0;
-  platforms = [{ x: 80, y: 420, w: 220, h: PLATFORM_H, scored: false }];
-  nextGap = random(MIN_GAP, MAX_GAP);
+  combo = maxCombo = lastScoreTime = gameTime = 0;
+  coins = [];
+  particles = [];
+  platforms = [{ x: 80, y: 420, w: 220, h: PLATFORM_H, scored: false, moving: false, baseY: 420, previousY: 420 }];
+  nextGap = getNextGap();
   lastTime = null;
   state = PLAYING;
 }
 
 function spawnPlatform() {
+  const difficulty = getDifficulty();
   const previous = platforms[platforms.length - 1];
-  const minY = previous ? Math.max(PLATFORM_MIN_Y, previous.y - MAX_VERTICAL_DELTA) : PLATFORM_MIN_Y;
-  const maxY = previous ? Math.min(PLATFORM_MAX_Y, previous.y + MAX_VERTICAL_DELTA) : PLATFORM_MAX_Y;
-  platforms.push({ x: W + 40, y: random(minY, maxY), w: random(PLATFORM_MIN_W, PLATFORM_MAX_W), h: PLATFORM_H, scored: false });
-  nextGap = random(MIN_GAP, MAX_GAP);
+  const delta = lerp(MAX_VERTICAL_DELTA, 360, difficulty);
+  const minY = previous ? Math.max(PLATFORM_MIN_Y, previous.y - delta) : PLATFORM_MIN_Y;
+  const maxY = previous ? Math.min(PLATFORM_MAX_Y, previous.y + delta) : PLATFORM_MAX_Y;
+  const y = random(minY, maxY);
+  const platform = {
+    x: W + 40, y, previousY: y, baseY: y,
+    w: clamp(lerp(220, 130, difficulty) + random(-20, 20), 110, PLATFORM_MAX_W),
+    h: PLATFORM_H, scored: false,
+    moving: Math.random() < lerp(0, 0.35, difficulty),
+    amp: random(40, 100), phase: random(0, Math.PI * 2),
+    angularSpeed: random(1.2, 2.6)
+  };
+  // 保持生成高度连续；摆动抵达安全区边缘时限制高度。
+  if (platform.moving) {
+    platform.baseY = y - Math.sin(gameTime * platform.angularSpeed + platform.phase) * platform.amp;
+  }
+  platforms.push(platform);
+  if (Math.random() < COIN_CHANCE) {
+    let coinY = platform.y + platform.h / 2 - 45;
+    if (coinY < 100 || coinY > H - 100) coinY = platform.y + platform.h / 2 + 45;
+    coins.push({ x: platform.x + platform.w / 2, y: coinY, r: COIN_RADIUS, collected: false });
+  }
+  nextGap = getNextGap();
+}
+
+function updateMovingPlatforms(dt, time) {
+  for (const platform of platforms) {
+    platform.previousY = platform.y;
+    if (platform.moving) {
+      platform.y = clamp(platform.baseY + Math.sin(time * platform.angularSpeed + platform.phase) * platform.amp,
+        PLATFORM_MIN_Y, PLATFORM_MAX_Y);
+    }
+  }
+}
+
+function updateCoins(dt) {
+  const speed = Math.min(BASE_SPEED + score * SPEED_PER_SCORE, MAX_SPEED);
+  for (const coin of coins) coin.x -= speed * COIN_SPEED_FACTOR * dt;
+  coins = coins.filter(coin => !coin.collected && coin.x + coin.r >= 0);
+}
+
+function checkCoinCollision() {
+  for (const coin of coins) {
+    const dx = coin.x - clamp(coin.x, player.x, player.x + PLAYER_SIZE);
+    const dy = coin.y - clamp(coin.y, player.y, player.y + PLAYER_SIZE);
+    if (dx * dx + dy * dy < coin.r * coin.r) {
+      coin.collected = true;
+      score += 1;
+      spawnParticles(coin.x, coin.y, 12, '#facc15', 0.5);
+      updateBest();
+    }
+  }
+  coins = coins.filter(coin => !coin.collected);
+}
+
+function updateCombo(dt, now) {
+  if (now - lastScoreTime > COMBO_TIMEOUT) combo = 0;
+}
+
+function spawnParticles(x, y, count, color, life = 0.4) {
+  for (let i = 0; i < count; i++) {
+    const angle = random(0, Math.PI * 2), speed = random(80, 180);
+    particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life, maxLife: life, color, size: random(2, 5) });
+  }
+}
+
+function updateParticles(dt) {
+  for (const particle of particles) {
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.vy += PARTICLE_GRAVITY * dt;
+    particle.life -= dt;
+  }
+  particles = particles.filter(particle => particle.life > 0);
+}
+
+function drawParticles() {
+  ctx.save();
+  for (const particle of particles) {
+    ctx.globalAlpha = clamp(particle.life / particle.maxLife, 0, 1);
+    ctx.fillStyle = particle.color;
+    ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+  }
+  ctx.restore();
 }
 
 function handleFlip() {
   if (state !== PLAYING) { resetGame(); return; }
   standingPlatform = null;
+  spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 8, '#fbbf24', 0.35);
   gravityDir *= -1;
   player.vy = gravityDir * FLIP_IMPULSE;
 }
@@ -76,20 +172,21 @@ function checkCollision(previousY) {
   for (const platform of platforms) {
     const overlapX = player.x + PLAYER_SIZE > platform.x && player.x < platform.x + platform.w;
     if (!overlapX) continue;
+    const oldY = platform.previousY ?? platform.y;
+    // 对玩家与平台的相对位移做跨面检测，兼容上下摆动。
+    const oldDistance = gravityDir === 1
+      ? previousY + PLAYER_SIZE - oldY
+      : oldY + platform.h - previousY;
+    const newDistance = gravityDir === 1
+      ? player.y + PLAYER_SIZE - platform.y
+      : platform.y + platform.h - player.y;
+    const approaching = newDistance >= oldDistance;
+    const correctVelocity = gravityDir === 1 ? player.vy >= 0 : player.vy <= 0;
+    const crossed = correctVelocity && approaching && oldDistance <= 0 && newDistance >= 0;
     const overlapY = player.y + PLAYER_SIZE >= platform.y && player.y <= platform.y + platform.h;
-    let crossed = false, near = false, contact = Infinity;
-    if (gravityDir === 1 && player.vy >= 0) {
-      const oldBottom = previousY + PLAYER_SIZE;
-      const bottom = player.y + PLAYER_SIZE;
-      crossed = oldBottom <= platform.y && bottom >= platform.y;
-      near = overlapY && oldBottom <= platform.y + COLLISION_TOLERANCE && Math.abs(bottom - platform.y) <= COLLISION_TOLERANCE;
-      contact = (platform.y - oldBottom) / (bottom - oldBottom || 1);
-    } else if (gravityDir === -1 && player.vy <= 0) {
-      const surface = platform.y + platform.h;
-      crossed = previousY >= surface && player.y <= surface;
-      near = overlapY && previousY >= surface - COLLISION_TOLERANCE && Math.abs(player.y - surface) <= COLLISION_TOLERANCE;
-      contact = (previousY - surface) / (previousY - player.y || 1);
-    }
+    const near = correctVelocity && approaching && overlapY &&
+      oldDistance <= COLLISION_TOLERANCE && Math.abs(newDistance) <= COLLISION_TOLERANCE;
+    const contact = -oldDistance / (newDistance - oldDistance || 1);
     // 跨面检测补充 AABB，避免高速下落时一帧穿过平台。
     if ((crossed || near) && Math.max(0, contact) < firstContact) {
       firstContact = Math.max(0, contact);
@@ -102,20 +199,33 @@ function checkCollision(previousY) {
   standingPlatform = landing;
   if (!landing.scored) {
     landing.scored = true;
-    score += 1;
+    combo += 1;
+    maxCombo = Math.max(maxCombo, combo);
+    lastScoreTime = gameTime;
+    score += combo >= 3 ? 2 : 1;
+    spawnParticles(player.x + PLAYER_SIZE / 2,
+      gravityDir === 1 ? player.y + PLAYER_SIZE : player.y, 10, '#22c55e', 0.4);
     updateBest();
   }
 }
 
 function gameOver() {
   state = GAME_OVER;
+  combo = 0;
+  spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 20, '#ef4444', 0.6);
   updateBest();
 }
 
 function update(dt) {
+  if (state === GAME_OVER) { updateParticles(dt); return; }
   if (state !== PLAYING) return;
+  gameTime += dt;
+  updateCombo(dt, gameTime);
+  updateParticles(dt);
   const currentSpeed = Math.min(BASE_SPEED + score * SPEED_PER_SCORE, MAX_SPEED);
   for (const platform of platforms) platform.x -= currentSpeed * dt;
+  updateMovingPlatforms(dt, gameTime);
+  updateCoins(dt);
   if (standingPlatform) {
     const platform = standingPlatform;
     if (player.x + PLAYER_SIZE > platform.x && player.x < platform.x + platform.w) {
@@ -133,6 +243,7 @@ function update(dt) {
     checkCollision(previousY);
   }
   if (player.y < 0 || player.y + PLAYER_SIZE > H) { gameOver(); return; }
+  checkCoinCollision();
   const latest = platforms[platforms.length - 1];
   if (!latest || latest.x < W - nextGap) spawnPlatform();
   platforms = platforms.filter(platform => platform.x + platform.w >= 0);
@@ -145,7 +256,16 @@ function draw() {
   ctx.fillRect(0, 0, W, 2);
   ctx.fillRect(0, H - 2, W, 2);
   ctx.fillStyle = '#22c55e';
-  for (const platform of platforms) ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
+  for (const platform of platforms) {
+    ctx.fillStyle = platform.moving ? '#38bdf8' : '#22c55e';
+    ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
+  }
+  ctx.fillStyle = '#facc15';
+  for (const coin of coins) {
+    ctx.beginPath();
+    ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.fillStyle = '#fbbf24';
   ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
   ctx.fillStyle = '#f9fafb';
@@ -153,11 +273,17 @@ function draw() {
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   ctx.fillText('分数: ' + score, 20, 22);
+  if (combo >= 2) {
+    ctx.fillStyle = '#facc15';
+    ctx.fillText('连击 x' + combo, 20, 50);
+    ctx.fillStyle = '#f9fafb';
+  }
   ctx.textAlign = 'right';
   ctx.fillText('最高: ' + best, W - 20, 22);
-  if (state === PLAYING) return;
+  if (state === PLAYING) { drawParticles(); return; }
   ctx.fillStyle = 'rgba(17, 24, 39, 0.84)';
   ctx.fillRect(0, 0, W, H);
+  drawParticles();
   ctx.fillStyle = '#f9fafb';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -171,8 +297,9 @@ function draw() {
     ctx.font = '24px Arial, sans-serif';
     ctx.fillText('分数: ' + score, W / 2, 335);
     ctx.fillText('最高: ' + best, W / 2, 380);
+    ctx.fillText('最高连击: ' + maxCombo, W / 2, 425);
     ctx.font = '22px Arial, sans-serif';
-    ctx.fillText('点击或按空格重开', W / 2, 450);
+    ctx.fillText('点击或按空格重开', W / 2, 485);
   }
 }
 
