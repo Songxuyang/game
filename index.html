@@ -3,49 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>重力翻转小人 MVP v1.2</title>
+<title>重力翻转小人 MVP v1.3</title>
 <style>
 * { box-sizing: border-box; }
+:root { --accent: #fbbf24; --skin-text: #f9fafb; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
-button { font: inherit; color: #f9fafb; background: #1f2937; border: 1px solid #475569; border-radius: 8px; padding: 8px 12px; cursor: pointer; touch-action: manipulation; }
-button:focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+body { min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--skin-text); background: radial-gradient(circle at 50% 0%, #1e293b, #0b1120 60%, #000000); touch-action: auto; }
+button { padding: 6px 12px; border-radius: 8px; background: rgba(255,255,255,.08); color: #f9fafb; border: 1px solid rgba(255,255,255,.15); font: 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; cursor: pointer; backdrop-filter: blur(6px); transition: background .15s, transform .1s; touch-action: manipulation; }
+@media (hover: hover) { button:hover { background: rgba(255,255,255,.16); } }
+button:active { transform: scale(.96); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 [hidden] { display: none !important; }
-body { font-family: Arial, sans-serif; color: #f9fafb; display: flex; align-items: center; justify-content: center; background: #090e19; touch-action: auto; }
- .game-shell { width: min(100vw, calc((100vh - 84px) * 2 / 3)); position: relative; }
-.toolbar { height: 42px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
-.toast-slot { height: 34px; display: flex; justify-content: center; align-items: center; }
-#achievement-toast { margin: 0; font-size: 14px; color: #facc15; opacity: 0; transition: opacity .3s; pointer-events: none; text-align: center; }
-#achievement-toast.visible { opacity: 1; }
-canvas { display: block; width: 100%; height: auto; max-width: 100vw; max-height: 100vh; aspect-ratio: 480 / 720; background: #111827; touch-action: none; }
-@supports (height: 100dvh) { .game-shell { width: min(100vw, calc((100dvh - 84px) * 2 / 3)); } }
-#achievement-panel { position: fixed; inset: 0; z-index: 10; padding: 16px; display: flex; justify-content: center; align-items: center; background: rgba(3, 7, 18, .8); }
-.achievement-card { width: min(100%, 460px); max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 20px; background: #111827; border: 1px solid #475569; border-radius: 12px; }
-.achievement-card h2 { margin: 0 0 8px; font-size: 24px; }
-.achievement-card p { color: #9ca3af; font-size: 14px; line-height: 1.5; }
-.achievement-card ul { list-style: none; padding: 0; margin: 16px 0; }
-.achievement-card li { padding: 12px 0; border-bottom: 1px solid #374151; font-size: 15px; }
-.achievement-card li small { display: block; margin-top: 5px; color: #9ca3af; }
-.achievement-card li.unlocked strong { color: #facc15; }
-#close-achievements { width: 100%; }
+.game-shell { width: min(480px, 100vw, calc(100vh * 2 / 3)); }
+.canvas-frame { position: relative; aspect-ratio: 480 / 720; max-width: 100vw; max-height: 100vh; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06); }
+@supports (height: 100dvh) { .game-shell { width: min(480px, 100vw, calc(100dvh * 2 / 3)); } .canvas-frame { max-height: 100dvh; } }
+canvas#game { display: block; width: 100%; height: 100%; aspect-ratio: 480 / 720; outline: none; touch-action: none; }
+.toolbar { position: absolute; top: 10px; right: 10px; z-index: 10; display: flex; gap: 6px; }
+#achievement-toast { position: absolute; top: 14px; left: 50%; z-index: 30; width: max-content; max-width: calc(100% - 24px); margin: 0; padding: 8px 16px; border-radius: 999px; background: rgba(0,0,0,.75); color: #f9fafb; font-size: 14px; line-height: 1.4; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,.4); opacity: 0; transform: translate(-50%, 8px); transition: opacity .2s, transform .2s; pointer-events: none; }
+#achievement-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.game-panel { position: absolute; inset: 0; z-index: 20; background: rgba(15,23,42,.92); backdrop-filter: blur(10px); border-radius: 16px; padding: 20px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.panel-content { outline: none; }
+.panel-content h2 { margin: 0 0 12px; font-size: 20px; }
+.panel-content p { margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #cbd5e1; }
+.panel-content ul { list-style: none; display: grid; gap: 8px; padding: 0; margin: 16px 0; }
+.panel-content li { padding: 10px; background: rgba(255,255,255,.05); border-radius: 8px; font-size: 14px; }
+.panel-content li small { display: block; margin-top: 5px; color: #cbd5e1; font-size: 12px; }
+.panel-content li.unlocked strong { color: var(--accent); }
+.panel-close { width: 100%; margin-top: 12px; min-height: 38px; }
+.skin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.skin-option { display: flex; align-items: center; flex-direction: column; gap: 5px; min-height: 140px; padding: 12px 6px; border: 2px solid transparent; border-radius: 8px; background: rgba(255,255,255,.05); }
+.skin-option.equipped { border-color: var(--card-accent); background: rgba(255,255,255,.1); }
+.skin-option strong { font-size: 14px; }
+.skin-option small { color: #cbd5e1; font-size: 12px; }
+.skin-option canvas { width: 44px; height: 44px; pointer-events: none; }
+#skin-wallet { color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
 <main class="game-shell">
+<div class="canvas-frame">
+<canvas id="game" tabindex="-1" width="480" height="720" aria-label="重力翻转小人：点击、触摸或按空格开始和翻转重力">你的浏览器不支持 Canvas。</canvas>
 <div class="toolbar" aria-label="游戏设置">
 <button id="sound-toggle" type="button" aria-pressed="true">音效: 开</button>
 <button id="achievement-toggle" type="button" aria-expanded="false" aria-controls="achievement-panel">成就</button>
+<button id="skin-toggle" type="button" aria-expanded="false" aria-controls="skin-panel">皮肤</button>
 </div>
-<div class="toast-slot"><p id="achievement-toast" role="status" aria-live="polite"></p></div>
-<canvas id="game" tabindex="-1" width="480" height="720" aria-label="重力翻转小人：点击、触摸或按空格开始和翻转重力">你的浏览器不支持 Canvas。</canvas>
-</main>
-<div id="achievement-panel" hidden>
-<section id="achievement-card" class="achievement-card" role="dialog" aria-modal="true" aria-labelledby="achievement-title" tabindex="-1">
+<p id="achievement-toast" role="status" aria-live="polite"></p>
+<div id="achievement-panel" class="game-panel" hidden>
+<section id="achievement-card" class="panel-content" role="dialog" aria-modal="true" aria-labelledby="achievement-title" tabindex="-1">
 <h2 id="achievement-title">成就</h2>
-<p>查看期间游戏暂时停止。点击面板或关闭按钮返回，也可按 A 或 Esc。</p>
+<p>查看期间游戏暂停。点击条目或关闭按钮返回，也可按 A 或 Esc。</p>
 <ul id="achievement-list"></ul>
-<button id="close-achievements" type="button">关闭</button>
+<button id="close-achievements" class="panel-close" type="button">关闭</button>
 </section>
 </div>
+<div id="skin-panel" class="game-panel" hidden>
+<section id="skin-card" class="panel-content" role="dialog" aria-modal="true" aria-labelledby="skin-title" tabindex="-1">
+<h2 id="skin-title">皮肤</h2>
+<p id="skin-wallet" aria-live="polite">金币: 0</p>
+<div id="skin-grid" class="skin-grid"></div>
+<button id="close-skins" class="panel-close" type="button">关闭</button>
+</section>
+</div>
+</div>
+</main>
 <script>
 'use strict';
 const W = 480, H = 720;
@@ -61,7 +82,35 @@ const COMBO_TIMEOUT = 4, PARTICLE_GRAVITY = 400;
 const SPIKE_W = 14, SPIKE_H = 12, SPIKE_EDGE = 35, SPIKE_GAP = 50;
 const SOUND_KEY = 'gravity_flip_sound_enabled';
 const ACHIEVEMENTS_KEY = 'gravity_flip_achievements', STATS_KEY = 'gravity_flip_stats';
+const WALLET_KEY = 'gravity_flip_wallet', SKINS_KEY = 'gravity_flip_skins_unlocked', CURRENT_SKIN_KEY = 'gravity_flip_skin_current';
+const UI_FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
 const BEST_KEY = 'gravity_flip_best';
+const SKINS = [
+  { id: 'classic', name: '经典黄', price: 0,
+    playerFill: '#fbbf24', playerStroke: '#d97706', platformFill: '#22c55e', platformStroke: '#15803d', movingPlatformFill: '#3b82f6', coinFill: '#facc15',
+    particleColor: '#fbbf24', bgTop: '#111827', bgBottom: '#1f2937', textColor: '#f9fafb', accentColor: '#fbbf24' },
+  { id: 'ghost', name: '幽灵白', price: 30,
+    playerFill: '#e5e7eb', playerStroke: '#9ca3af', platformFill: '#4b5563', platformStroke: '#6b7280', movingPlatformFill: '#818cf8', coinFill: '#fde68a',
+    particleColor: '#e5e7eb', bgTop: '#0f172a', bgBottom: '#1e293b', textColor: '#f9fafb', accentColor: '#e5e7eb' },
+  { id: 'neon', name: '霓虹青', price: 60,
+    playerFill: '#22d3ee', playerStroke: '#0891b2', platformFill: '#34d399', platformStroke: '#059669', movingPlatformFill: '#a78bfa', coinFill: '#fde047',
+    particleColor: '#22d3ee', bgTop: '#020617', bgBottom: '#0f172a', textColor: '#e0f2fe', accentColor: '#22d3ee' },
+  { id: 'lava', name: '熔岩橙', price: 100,
+    playerFill: '#fb923c', playerStroke: '#c2410c', platformFill: '#7f1d1d', platformStroke: '#b91c1c', movingPlatformFill: '#f59e0b', coinFill: '#fde047',
+    particleColor: '#fb923c', bgTop: '#1c0a0a', bgBottom: '#3f1212', textColor: '#fee2e2', accentColor: '#fb923c' },
+  { id: 'cyber', name: '赛博紫', price: 150,
+    playerFill: '#c084fc', playerStroke: '#7e22ce', platformFill: '#06b6d4', platformStroke: '#0e7490', movingPlatformFill: '#f472b6', coinFill: '#fde047',
+    particleColor: '#c084fc', bgTop: '#1e1b4b', bgBottom: '#312e81', textColor: '#f5d0fe', accentColor: '#c084fc' },
+  { id: 'sakura', name: '樱花粉', price: 180,
+    playerFill: '#fda4af', playerStroke: '#e11d48', platformFill: '#fbcfe8', platformStroke: '#db2777', movingPlatformFill: '#a5b4fc', coinFill: '#fde68a',
+    particleColor: '#fda4af', bgTop: '#1f1020', bgBottom: '#3b1833', textColor: '#fce7f3', accentColor: '#fda4af' },
+  { id: 'mono', name: '极简黑白', price: 220,
+    playerFill: '#f9fafb', playerStroke: '#d1d5db', platformFill: '#374151', platformStroke: '#6b7280', movingPlatformFill: '#9ca3af', coinFill: '#f9fafb',
+    particleColor: '#f9fafb', bgTop: '#000000', bgBottom: '#111111', textColor: '#f9fafb', accentColor: '#f9fafb' },
+  { id: 'forest', name: '森林绿', price: 280,
+    playerFill: '#bef264', playerStroke: '#4d7c0f', platformFill: '#166534', platformStroke: '#22c55e', movingPlatformFill: '#facc15', coinFill: '#fde047',
+    particleColor: '#bef264', bgTop: '#052e16', bgBottom: '#14532d', textColor: '#ecfccb', accentColor: '#bef264' },
+];
 const READY = 'READY', PLAYING = 'PLAYING', GAME_OVER = 'GAME_OVER';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -71,7 +120,8 @@ let coins = [], particles = [];
 let combo = 0, maxCombo = 0, lastScoreTime = 0, gameTime = 0;
 let runCoins = 0, runFlips = 0, runTime = 0, runMovingPlatformStands = 0, deathCause = '';
 let audioContext = null, soundEnabled = true, achievementPanelOpen = false;
-let toastQueue = [], toastActive = false, panelReturnFocus = null;
+let toastTimer = null, panelReturnFocus = null;
+let skinPanelOpen = false, isPausedByPanel = false;
 let lastTime = null, lastTouchTime = -Infinity;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const random = (min, max) => min + Math.random() * (max - min);
@@ -189,18 +239,14 @@ const stats = loadStats();
 try { soundEnabled = localStorage.getItem(SOUND_KEY) !== '0'; } catch (_) {}
 renderSoundButton();
 
-function showAchievementToast(name) {
-  if (name) toastQueue.push(name);
-  if (toastActive || !toastQueue.length) return;
-  toastActive = true;
+function showToast(message) {
+  clearTimeout(toastTimer);
   const toast = document.getElementById('achievement-toast');
-  toast.textContent = '成就解锁：' + toastQueue.shift();
+  toast.textContent = message;
   toast.classList.add('visible');
-  setTimeout(() => {
-    toast.classList.remove('visible');
-    setTimeout(() => { toastActive = false; showAchievementToast(); }, 300);
-  }, 2000);
+  toastTimer = setTimeout(() => toast.classList.remove('visible'), 2000);
 }
+function showAchievementToast(name) { showToast('成就解锁：' + name); }
 
 function unlockAchievement(id) {
   const item = ACHIEVEMENTS.find(achievement => achievement.id === id);
@@ -231,19 +277,31 @@ function renderAchievementPanel() {
     list.append(row);
   }
 }
-function toggleAchievementPanel() {
-  achievementPanelOpen = !achievementPanelOpen;
+// 两个面板互斥，共用暂停与恢复逻辑，切换时不让物理世界前进。
+function setPanel(panel) {
+  const wasOpen = isPausedByPanel;
+  if (!wasOpen && panel) panelReturnFocus = document.activeElement;
+  achievementPanelOpen = panel === 'achievement';
+  skinPanelOpen = panel === 'skin';
+  isPausedByPanel = achievementPanelOpen || skinPanelOpen;
   document.getElementById('achievement-panel').hidden = !achievementPanelOpen;
+  document.getElementById('skin-panel').hidden = !skinPanelOpen;
   document.getElementById('achievement-toggle').setAttribute('aria-expanded', String(achievementPanelOpen));
+  document.getElementById('skin-toggle').setAttribute('aria-expanded', String(skinPanelOpen));
   lastTime = null;
-  if (achievementPanelOpen) {
-    panelReturnFocus = document.activeElement;
-    renderAchievementPanel();
-    const card = document.getElementById('achievement-card');
-    card.scrollTop = 0;
+  if (panel) {
+    if (achievementPanelOpen) renderAchievementPanel();
+    else buildSkinPanel();
+    const overlay = document.getElementById(achievementPanelOpen ? 'achievement-panel' : 'skin-panel');
+    const card = document.getElementById(achievementPanelOpen ? 'achievement-card' : 'skin-card');
+    overlay.scrollTop = 0;
     card.focus({ preventScroll: true });
-  } else if (panelReturnFocus && panelReturnFocus.focus) panelReturnFocus.focus();
+  } else if (panelReturnFocus && panelReturnFocus.isConnected) {
+    panelReturnFocus.focus({ preventScroll: true });
+  } else canvas.focus({ preventScroll: true });
 }
+function toggleAchievementPanel() { setPanel(achievementPanelOpen ? null : 'achievement'); }
+function toggleSkinPanel() { setPanel(skinPanelOpen ? null : 'skin'); }
 
 function updateSpikes(platform) {
   platform.spikes = [];
@@ -287,6 +345,112 @@ function drawSpikes(platform) {
     ctx.lineTo(x + spike.w, platform.y);
     ctx.closePath();
     ctx.fill();
+  }
+}
+
+function loadWallet() {
+  try {
+    const value = Number(localStorage.getItem(WALLET_KEY));
+    if (Number.isSafeInteger(value) && value >= 0) return value;
+  } catch (_) {}
+  return 0;
+}
+function saveWallet() {
+  try { localStorage.setItem(WALLET_KEY, String(wallet)); } catch (_) {}
+}
+function loadUnlockedSkins() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SKINS_KEY));
+    if (Array.isArray(saved)) return [...new Set(['classic', ...saved.filter(id => SKINS.some(skin => skin.id === id))])];
+  } catch (_) {}
+  return ['classic'];
+}
+function saveUnlockedSkins() {
+  try { localStorage.setItem(SKINS_KEY, JSON.stringify(unlockedSkins)); } catch (_) {}
+}
+function loadCurrentSkin() {
+  try {
+    const id = localStorage.getItem(CURRENT_SKIN_KEY);
+    if (unlockedSkins.includes(id)) return SKINS.find(skin => skin.id === id) || SKINS[0];
+  } catch (_) {}
+  return SKINS[0];
+}
+function saveCurrentSkin() {
+  try { localStorage.setItem(CURRENT_SKIN_KEY, currentSkin.id); } catch (_) {}
+}
+let wallet = loadWallet();
+let unlockedSkins = loadUnlockedSkins();
+let currentSkin = loadCurrentSkin();
+function getCurrentSkin() { return currentSkin; }
+function applySkinTheme() {
+  document.documentElement.style.setProperty('--accent', currentSkin.accentColor);
+  document.documentElement.style.setProperty('--skin-text', currentSkin.textColor);
+}
+applySkinTheme();
+
+function buySkin(id) {
+  const skin = SKINS.find(item => item.id === id);
+  if (!skin) return false;
+  if (unlockedSkins.includes(id)) return selectSkin(id);
+  if (skin.price > wallet) { showToast('金币不足'); return false; }
+  wallet -= skin.price;
+  saveWallet();
+  unlockedSkins.push(id);
+  saveUnlockedSkins();
+  selectSkin(id);
+  playSound('achievement');
+  return true;
+}
+function selectSkin(id) {
+  const skin = SKINS.find(item => item.id === id);
+  if (!skin) return false;
+  if (!unlockedSkins.includes(id)) return buySkin(id);
+  currentSkin = skin;
+  for (const particle of particles) {
+    particle.color = particle.kind === 'death' ? '#ef4444' : particle.kind === 'coin' ? skin.coinFill : skin.particleColor;
+  }
+  saveCurrentSkin();
+  applySkinTheme();
+  if (skinPanelOpen) buildSkinPanel();
+  return true;
+}
+function drawSkinPreview(context, skin, x, y, size) {
+  context.fillStyle = skin.playerFill;
+  context.fillRect(x, y, size, size);
+  context.strokeStyle = skin.playerStroke;
+  context.lineWidth = 2;
+  context.strokeRect(x + 1, y + 1, size - 2, size - 2);
+}
+function buildSkinPanel() {
+  document.getElementById('skin-wallet').textContent = '金币: ' + wallet;
+  const grid = document.getElementById('skin-grid');
+  const focusedId = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.skin : null;
+  grid.replaceChildren();
+  for (const skin of SKINS) {
+    const equipped = currentSkin.id === skin.id;
+    const unlocked = unlockedSkins.includes(skin.id);
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'skin-option' + (equipped ? ' equipped' : '');
+    card.dataset.skin = skin.id;
+    card.style.setProperty('--card-accent', skin.accentColor);
+    card.setAttribute('aria-pressed', String(equipped));
+    const preview = document.createElement('canvas');
+    preview.width = preview.height = 44;
+    preview.setAttribute('aria-hidden', 'true');
+    drawSkinPreview(preview.getContext('2d'), skin, 6, 6, 32);
+    const name = document.createElement('strong');
+    name.textContent = skin.name;
+    const status = document.createElement('small');
+    status.textContent = equipped ? '已装备' : unlocked ? '已解锁' : '价格 ' + skin.price + ' 金币';
+    card.append(preview, name, status);
+    card.addEventListener('click', event => {
+      event.stopPropagation();
+      initAudio();
+      selectSkin(skin.id);
+    });
+    grid.append(card);
+    if (focusedId === skin.id) card.focus({ preventScroll: true });
   }
 }
 
@@ -364,12 +528,14 @@ function checkCoinCollision() {
     if (dx * dx + dy * dy < coin.r * coin.r) {
       coin.collected = true;
       score += 1;
+      wallet += 1;
+      saveWallet();
       runCoins += 1;
       stats.totalCoins += 1;
       saveStats();
       playSound('coin');
       checkAchievements();
-      spawnParticles(coin.x, coin.y, 12, '#facc15', 0.5);
+      spawnParticles(coin.x, coin.y, 12, getCurrentSkin().coinFill, 0.5, 'coin');
       updateBest();
     }
   }
@@ -380,11 +546,11 @@ function updateCombo(dt, now) {
   if (now - lastScoreTime > COMBO_TIMEOUT) combo = 0;
 }
 
-function spawnParticles(x, y, count, color, life = 0.4) {
+function spawnParticles(x, y, count, color, life = 0.4, kind = 'skin') {
   for (let i = 0; i < count; i++) {
     const angle = random(0, Math.PI * 2), speed = random(80, 180);
     particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life, maxLife: life, color, size: random(2, 5) });
+      life, maxLife: life, color, kind, size: random(2, 5) });
   }
 }
 
@@ -409,7 +575,7 @@ function drawParticles() {
 }
 
 function handleFlip() {
-  if (achievementPanelOpen) return;
+  if (isPausedByPanel) return;
   initAudio();
   if (state !== PLAYING) { resetGame(); return; }
   runFlips += 1;
@@ -418,7 +584,7 @@ function handleFlip() {
   playSound('flip');
   checkAchievements();
   standingPlatform = null;
-  spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 8, '#fbbf24', 0.35);
+  spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 8, getCurrentSkin().particleColor, 0.35);
   gravityDir *= -1;
   player.vy = gravityDir * FLIP_IMPULSE;
 }
@@ -464,7 +630,7 @@ function checkCollision(previousY) {
     playSound(combo >= 3 ? 'combo' : 'score');
     checkAchievements();
     spawnParticles(player.x + PLAYER_SIZE / 2,
-      gravityDir === 1 ? player.y + PLAYER_SIZE : player.y, 10, '#22c55e', 0.4);
+      gravityDir === 1 ? player.y + PLAYER_SIZE : player.y, 10, getCurrentSkin().particleColor, 0.4);
     updateBest();
   }
 }
@@ -478,12 +644,12 @@ function gameOver(cause = 'boundary') {
   checkAchievements();
   state = GAME_OVER;
   combo = 0;
-  spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 20, '#ef4444', 0.6);
+  spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 20, '#ef4444', 0.6, 'death');
   updateBest();
 }
 
 function update(dt) {
-  if (achievementPanelOpen) return;
+  if (isPausedByPanel) return;
   if (state === GAME_OVER) { updateParticles(dt); return; }
   if (state !== PLAYING) return;
   gameTime += dt;
@@ -520,71 +686,116 @@ function update(dt) {
   platforms = platforms.filter(platform => platform.x + platform.w >= 0);
 }
 
-function draw() {
-  ctx.fillStyle = '#111827';
+function drawBackground() {
+  const skin = getCurrentSkin();
+  const gradient = ctx.createLinearGradient(0, 0, 0, H);
+  gradient.addColorStop(0, skin.bgTop);
+  gradient.addColorStop(1, skin.bgBottom);
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, W, H);
+}
+function roundedCard(x, y, width, height, radius = 16) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
+}
+function drawMenuCard(lines) {
+  const width = 340, padding = 30, gap = 14;
+  const height = padding * 2 + lines.reduce((sum, line) => sum + line.size, 0) + gap * (lines.length - 1);
+  const y = (H - height) / 2;
+  ctx.save();
+  roundedCard((W - width) / 2, y, width, height);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  let textY = y + padding;
+  for (const line of lines) {
+    ctx.font = (line.bold ? 'bold ' : '') + line.size + 'px ' + UI_FONT;
+    ctx.fillStyle = line.color || currentSkin.textColor;
+    ctx.globalAlpha = line.alpha ?? 1;
+    ctx.fillText(line.text, W / 2, textY + line.size / 2);
+    textY += line.size + gap;
+  }
+  ctx.restore();
+}
+function drawReadyCard() {
+  drawMenuCard([
+    { text: '重力翻转小人', size: 24, bold: true },
+    { text: '点击或按空格开始', size: 14, color: currentSkin.accentColor },
+    { text: '成就: ' + unlockedAchievements.length + ' / ' + ACHIEVEMENTS.length, size: 12, alpha: 0.65 }
+  ]);
+}
+function drawGameOverCard() {
+  const lines = [
+    { text: '游戏结束', size: 22, bold: true },
+    { text: '分数: ' + score, size: 16, color: currentSkin.accentColor },
+    { text: '最高: ' + best, size: 14 },
+    { text: '最高连击: ' + maxCombo, size: 14 }
+  ];
+  if (deathCause === 'spike') lines.push({ text: '被尖刺刺中', size: 12, color: '#ef4444' });
+  lines.push(
+    { text: '点击或按空格重开', size: 14, color: currentSkin.accentColor },
+    { text: '成就: ' + unlockedAchievements.length + ' / ' + ACHIEVEMENTS.length, size: 12, alpha: 0.65 }
+  );
+  drawMenuCard(lines);
+}
+function draw() {
+  const skin = getCurrentSkin();
+  drawBackground();
   ctx.fillStyle = '#ef4444';
   ctx.fillRect(0, 0, W, 2);
   ctx.fillRect(0, H - 2, W, 2);
-  ctx.fillStyle = '#22c55e';
   for (const platform of platforms) {
-    ctx.fillStyle = platform.moving ? '#38bdf8' : '#22c55e';
+    ctx.fillStyle = platform.moving ? skin.movingPlatformFill : skin.platformFill;
     ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
+    ctx.strokeStyle = skin.platformStroke;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(platform.x + 1, platform.y + 1, platform.w - 2, platform.h - 2);
     drawSpikes(platform);
   }
-  ctx.fillStyle = '#facc15';
+  ctx.fillStyle = skin.coinFill;
   for (const coin of coins) {
     ctx.beginPath();
     ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
-  ctx.fillStyle = '#f9fafb';
-  ctx.font = '20px Arial, sans-serif';
+  drawSkinPreview(ctx, skin, player.x, player.y, PLAYER_SIZE);
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.fillText('分数: ' + score, 20, 22);
+  ctx.fillStyle = skin.accentColor;
+  ctx.font = 'bold 18px ' + UI_FONT;
+  // 为右上方 DOM 按钮组留出一行空间。
+  const hudTop = Math.max(68, 54 * W / (canvas.clientWidth || W));
+  ctx.fillText('分数: ' + score, 20, hudTop);
   if (combo >= 2) {
-    ctx.fillStyle = '#facc15';
-    ctx.fillText('连击 x' + combo, 20, 50);
-    ctx.fillStyle = '#f9fafb';
+    const pulse = 1 + (Math.sin(gameTime * 6) + 1) * 0.03;
+    ctx.save();
+    ctx.translate(20, hudTop + 26);
+    ctx.scale(pulse, pulse);
+    ctx.font = '14px ' + UI_FONT;
+    ctx.fillText('连击 x' + combo, 0, 0);
+    ctx.restore();
   }
   ctx.textAlign = 'right';
-  ctx.fillText('最高: ' + best, W - 20, 22);
-  if (state === PLAYING) { drawParticles(); return; }
-  ctx.fillStyle = 'rgba(17, 24, 39, 0.84)';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = skin.textColor;
+  ctx.font = '14px ' + UI_FONT;
+  ctx.fillText('最高: ' + best, W - 20, hudTop);
+  ctx.fillText('金币: ' + wallet, W - 20, hudTop + 24);
   drawParticles();
-  ctx.fillStyle = '#f9fafb';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 36px Arial, sans-serif';
-  if (state === READY) {
-    ctx.fillText('重力翻转小人', W / 2, 315);
-    ctx.font = '22px Arial, sans-serif';
-    ctx.fillText('点击或按空格开始', W / 2, 385);
-    ctx.font = '18px Arial, sans-serif';
-    ctx.fillText('成就: ' + unlockedAchievements.length + ' / ' + ACHIEVEMENTS.length, W / 2, 435);
-  } else {
-    ctx.fillText('游戏结束', W / 2, 270);
-    ctx.font = '24px Arial, sans-serif';
-    ctx.fillText('分数: ' + score, W / 2, 335);
-    ctx.fillText('最高: ' + best, W / 2, 380);
-    ctx.fillText('最高连击: ' + maxCombo, W / 2, 425);
-    ctx.font = '22px Arial, sans-serif';
-    ctx.fillText('点击或按空格重开', W / 2, 485);
-    ctx.font = '18px Arial, sans-serif';
-    ctx.fillText('成就: ' + unlockedAchievements.length + ' / ' + ACHIEVEMENTS.length, W / 2, 530);
-    if (deathCause === 'spike') {
-      ctx.fillStyle = '#f87171';
-      ctx.fillText('被尖刺刺中', W / 2, 570);
-    }
-  }
+  if (state === READY) drawReadyCard();
+  else if (state === GAME_OVER) drawGameOverCard();
 }
 
-// DOM 控件独立消费输入，触摸产生的后续 click 也不会传入画布。
-for (const id of ['sound-toggle', 'achievement-toggle', 'close-achievements', 'achievement-panel']) {
+// 所有 DOM 控件单独消费事件，避免触摸兼容事件触发画布操作。
+for (const id of ['sound-toggle', 'achievement-toggle', 'skin-toggle', 'achievement-panel', 'skin-panel']) {
   const element = document.getElementById(id);
   for (const eventName of ['mousedown', 'touchstart']) {
     element.addEventListener(eventName, event => event.stopPropagation());
@@ -599,9 +810,18 @@ document.getElementById('achievement-toggle').addEventListener('click', event =>
   initAudio();
   toggleAchievementPanel();
 });
+document.getElementById('skin-toggle').addEventListener('click', event => {
+  event.stopPropagation();
+  initAudio();
+  toggleSkinPanel();
+});
 document.getElementById('achievement-panel').addEventListener('click', event => {
   event.stopPropagation();
-  if (achievementPanelOpen) toggleAchievementPanel();
+  if (achievementPanelOpen) setPanel(null);
+});
+document.getElementById('skin-panel').addEventListener('click', event => {
+  event.stopPropagation();
+  if (event.target === event.currentTarget || event.target.closest('#close-skins')) setPanel(null);
 });
 window.addEventListener('keydown', event => {
   if (event.code === 'KeyM' || event.key.toLowerCase() === 'm') {
@@ -609,23 +829,32 @@ window.addEventListener('keydown', event => {
     if (!event.repeat) toggleSound();
     return;
   }
-  if (event.code === 'KeyA' || event.key.toLowerCase() === 'a') {
+  if (event.code === 'KeyA' || event.code === 'KeyS' || ['a', 's'].includes(event.key.toLowerCase())) {
     event.preventDefault();
     initAudio();
-    if (!event.repeat) toggleAchievementPanel();
+    if (!event.repeat) {
+      if (event.code === 'KeyA' || event.key.toLowerCase() === 'a') toggleAchievementPanel();
+      else toggleSkinPanel();
+    }
     return;
   }
-  if (achievementPanelOpen) {
-    if (event.key === 'Escape') { event.preventDefault(); toggleAchievementPanel(); }
+  if (isPausedByPanel) {
+    if (event.key === 'Escape') { event.preventDefault(); setPanel(null); }
     else if (event.key === 'Tab') {
+      const panel = document.getElementById(skinPanelOpen ? 'skin-panel' : 'achievement-panel');
+      const buttons = [...panel.querySelectorAll('button')];
+      const index = buttons.indexOf(document.activeElement);
       event.preventDefault();
-      document.getElementById('close-achievements').focus();
-    } else if (event.code === 'Space' || event.key === ' ') event.preventDefault();
+      const next = event.shiftKey ? (index <= 0 ? buttons.length - 1 : index - 1) : (index + 1) % buttons.length;
+      if (buttons[next]) buttons[next].focus();
+    } else if (event.code === 'Space' || event.key === ' ') {
+      event.preventDefault();
+      if (!event.repeat && event.target && event.target.tagName === 'BUTTON') event.target.click();
+    }
     return;
   }
   if (event.code !== 'Space' && event.key !== ' ') return;
   event.preventDefault();
-  // 已聚焦按钮用空格激活时，不把同一按键当作翻转。
   if (event.target && event.target.tagName === 'BUTTON') {
     if (!event.repeat) event.target.click();
     return;
@@ -647,7 +876,7 @@ canvas.addEventListener('touchstart', event => {
   }
 }, { passive: false });
 window.addEventListener('touchmove', event => {
-  if (achievementPanelOpen && event.target.closest('.achievement-card')) return;
+  if (isPausedByPanel && event.target.closest('.game-panel')) return;
   event.preventDefault();
 }, { passive: false });
 document.addEventListener('visibilitychange', () => { lastTime = null; });
