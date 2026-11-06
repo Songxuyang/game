@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>重力翻转小人 MVP v1.3</title>
+<title>重力翻转小人 MVP v1.4</title>
 <style>
 * { box-sizing: border-box; }
 :root { --accent: #fbbf24; --skin-text: #f9fafb; }
@@ -36,6 +36,7 @@ canvas#game { display: block; width: 100%; height: 100%; aspect-ratio: 480 / 720
 .skin-option strong { font-size: 14px; }
 .skin-option small { color: #cbd5e1; font-size: 12px; }
 .skin-option canvas { width: 44px; height: 44px; pointer-events: none; }
+#effects-toggle { margin: 0 0 14px; min-height: 36px; }
 #skin-wallet { color: var(--accent); font-weight: 600; }
 </style>
 </head>
@@ -61,6 +62,7 @@ canvas#game { display: block; width: 100%; height: 100%; aspect-ratio: 480 / 720
 <section id="skin-card" class="panel-content" role="dialog" aria-modal="true" aria-labelledby="skin-title" tabindex="-1">
 <h2 id="skin-title">皮肤</h2>
 <p id="skin-wallet" aria-live="polite">金币: 0</p>
+<button id="effects-toggle" type="button" aria-pressed="true">动画特效: 开</button>
 <div id="skin-grid" class="skin-grid"></div>
 <button id="close-skins" class="panel-close" type="button">关闭</button>
 </section>
@@ -82,32 +84,34 @@ const COMBO_TIMEOUT = 4, PARTICLE_GRAVITY = 400;
 const SPIKE_W = 14, SPIKE_H = 12, SPIKE_EDGE = 35, SPIKE_GAP = 50;
 const SOUND_KEY = 'gravity_flip_sound_enabled';
 const ACHIEVEMENTS_KEY = 'gravity_flip_achievements', STATS_KEY = 'gravity_flip_stats';
+const EFFECTS_KEY = 'gravity_flip_effects_enabled';
+const MAX_SHOCKWAVES = 8, MAX_BG_PARTICLES = 40;
 const WALLET_KEY = 'gravity_flip_wallet', SKINS_KEY = 'gravity_flip_skins_unlocked', CURRENT_SKIN_KEY = 'gravity_flip_skin_current';
 const UI_FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
 const BEST_KEY = 'gravity_flip_best';
 const SKINS = [
-  { id: 'classic', name: '经典黄', price: 0,
+  { id: 'classic', bgEffect: 'stars', bgEffectColor: '#fbbf24', name: '经典黄', price: 0,
     playerFill: '#fbbf24', playerStroke: '#d97706', platformFill: '#22c55e', platformStroke: '#15803d', movingPlatformFill: '#3b82f6', coinFill: '#facc15',
     particleColor: '#fbbf24', bgTop: '#111827', bgBottom: '#1f2937', textColor: '#f9fafb', accentColor: '#fbbf24' },
-  { id: 'ghost', name: '幽灵白', price: 30,
+  { id: 'ghost', bgEffect: 'stars', bgEffectColor: '#e5e7eb', name: '幽灵白', price: 30,
     playerFill: '#e5e7eb', playerStroke: '#9ca3af', platformFill: '#4b5563', platformStroke: '#6b7280', movingPlatformFill: '#818cf8', coinFill: '#fde68a',
     particleColor: '#e5e7eb', bgTop: '#0f172a', bgBottom: '#1e293b', textColor: '#f9fafb', accentColor: '#e5e7eb' },
-  { id: 'neon', name: '霓虹青', price: 60,
+  { id: 'neon', bgEffect: 'grid', bgEffectColor: '#22d3ee', name: '霓虹青', price: 60,
     playerFill: '#22d3ee', playerStroke: '#0891b2', platformFill: '#34d399', platformStroke: '#059669', movingPlatformFill: '#a78bfa', coinFill: '#fde047',
     particleColor: '#22d3ee', bgTop: '#020617', bgBottom: '#0f172a', textColor: '#e0f2fe', accentColor: '#22d3ee' },
-  { id: 'lava', name: '熔岩橙', price: 100,
+  { id: 'lava', bgEffect: 'embers', bgEffectColor: '#fb923c', name: '熔岩橙', price: 100,
     playerFill: '#fb923c', playerStroke: '#c2410c', platformFill: '#7f1d1d', platformStroke: '#b91c1c', movingPlatformFill: '#f59e0b', coinFill: '#fde047',
     particleColor: '#fb923c', bgTop: '#1c0a0a', bgBottom: '#3f1212', textColor: '#fee2e2', accentColor: '#fb923c' },
-  { id: 'cyber', name: '赛博紫', price: 150,
+  { id: 'cyber', bgEffect: 'grid', bgEffectColor: '#c084fc', name: '赛博紫', price: 150,
     playerFill: '#c084fc', playerStroke: '#7e22ce', platformFill: '#06b6d4', platformStroke: '#0e7490', movingPlatformFill: '#f472b6', coinFill: '#fde047',
     particleColor: '#c084fc', bgTop: '#1e1b4b', bgBottom: '#312e81', textColor: '#f5d0fe', accentColor: '#c084fc' },
-  { id: 'sakura', name: '樱花粉', price: 180,
+  { id: 'sakura', bgEffect: 'petals', bgEffectColor: '#fda4af', name: '樱花粉', price: 180,
     playerFill: '#fda4af', playerStroke: '#e11d48', platformFill: '#fbcfe8', platformStroke: '#db2777', movingPlatformFill: '#a5b4fc', coinFill: '#fde68a',
     particleColor: '#fda4af', bgTop: '#1f1020', bgBottom: '#3b1833', textColor: '#fce7f3', accentColor: '#fda4af' },
-  { id: 'mono', name: '极简黑白', price: 220,
+  { id: 'mono', bgEffect: 'none', bgEffectColor: '#ffffff', name: '极简黑白', price: 220,
     playerFill: '#f9fafb', playerStroke: '#d1d5db', platformFill: '#374151', platformStroke: '#6b7280', movingPlatformFill: '#9ca3af', coinFill: '#f9fafb',
     particleColor: '#f9fafb', bgTop: '#000000', bgBottom: '#111111', textColor: '#f9fafb', accentColor: '#f9fafb' },
-  { id: 'forest', name: '森林绿', price: 280,
+  { id: 'forest', bgEffect: 'fireflies', bgEffectColor: '#bef264', name: '森林绿', price: 280,
     playerFill: '#bef264', playerStroke: '#4d7c0f', platformFill: '#166534', platformStroke: '#22c55e', movingPlatformFill: '#facc15', coinFill: '#fde047',
     particleColor: '#bef264', bgTop: '#052e16', bgBottom: '#14532d', textColor: '#ecfccb', accentColor: '#bef264' },
 ];
@@ -122,6 +126,10 @@ let runCoins = 0, runFlips = 0, runTime = 0, runMovingPlatformStands = 0, deathC
 let audioContext = null, soundEnabled = true, achievementPanelOpen = false;
 let toastTimer = null, panelReturnFocus = null;
 let skinPanelOpen = false, isPausedByPanel = false;
+let visualTime = 0, effectsEnabled = loadEffectsEnabled();
+let shockwaves = [], bgParticles = [], bgSpawnTime = 0, bgStyle = '';
+let performanceLevel = 'high', avgFrameTime = 1 / 60;
+let performanceCheckTime = 0, recoveryTime = 0, visualSeed = 0x9e3779b9;
 let lastTime = null, lastTouchTime = -Infinity;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const random = (min, max) => min + Math.random() * (max - min);
@@ -406,6 +414,7 @@ function selectSkin(id) {
   if (!skin) return false;
   if (!unlockedSkins.includes(id)) return buySkin(id);
   currentSkin = skin;
+  initBgParticles();
   for (const particle of particles) {
     particle.color = particle.kind === 'death' ? '#ef4444' : particle.kind === 'coin' ? skin.coinFill : skin.particleColor;
   }
@@ -423,6 +432,7 @@ function drawSkinPreview(context, skin, x, y, size) {
 }
 function buildSkinPanel() {
   document.getElementById('skin-wallet').textContent = '金币: ' + wallet;
+  renderEffectsButton();
   const grid = document.getElementById('skin-grid');
   const focusedId = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.skin : null;
   grid.replaceChildren();
@@ -470,6 +480,7 @@ function resetGame() {
   combo = maxCombo = lastScoreTime = gameTime = 0;
   coins = [];
   particles = [];
+  shockwaves = [];
   platforms = [{ x: 80, y: 420, w: 220, h: PLATFORM_H, scored: false, moving: false, baseY: 420, previousY: 420, spikes: [] }];
   nextGap = getNextGap();
   lastTime = null;
@@ -500,7 +511,7 @@ function spawnPlatform() {
   if (Math.random() < COIN_CHANCE) {
     let coinY = platform.y + platform.h / 2 - 45;
     if (coinY < 100 || coinY > H - 100) coinY = platform.y + platform.h / 2 + 45;
-    coins.push({ x: platform.x + platform.w / 2, y: coinY, r: COIN_RADIUS, collected: false });
+    coins.push({ x: platform.x + platform.w / 2, y: coinY, r: COIN_RADIUS, phase: visualRandom(0, Math.PI * 2), collected: false });
   }
   nextGap = getNextGap();
 }
@@ -585,6 +596,7 @@ function handleFlip() {
   checkAchievements();
   standingPlatform = null;
   spawnParticles(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, 8, getCurrentSkin().particleColor, 0.35);
+  spawnShockwave();
   gravityDir *= -1;
   player.vy = gravityDir * FLIP_IMPULSE;
 }
@@ -638,6 +650,7 @@ function checkCollision(previousY) {
 function gameOver(cause = 'boundary') {
   if (state !== PLAYING) return;
   deathCause = cause;
+  shockwaves = [];
   stats.totalGames += 1;
   saveStats();
   playSound(cause === 'spike' ? 'spike_death' : 'death');
@@ -684,6 +697,215 @@ function update(dt) {
   const latest = platforms[platforms.length - 1];
   if (!latest || latest.x < W - nextGap) spawnPlatform();
   platforms = platforms.filter(platform => platform.x + platform.w >= 0);
+}
+
+// 装饰使用独立随机源，不消耗平台、金币和尖刺生成所用的随机序列。
+function visualRandom(min = 0, max = 1) {
+  visualSeed = (Math.imul(1664525, visualSeed) + 1013904223) >>> 0;
+  return min + (visualSeed / 4294967296) * (max - min);
+}
+function loadEffectsEnabled() {
+  try { return localStorage.getItem(EFFECTS_KEY) !== '0'; } catch (_) { return true; }
+}
+function saveEffectsEnabled() {
+  try { localStorage.setItem(EFFECTS_KEY, effectsEnabled ? '1' : '0'); } catch (_) {}
+}
+function renderEffectsButton() {
+  const button = document.getElementById('effects-toggle');
+  button.textContent = '动画特效: ' + (effectsEnabled ? '开' : '关');
+  button.setAttribute('aria-pressed', String(effectsEnabled));
+}
+function toggleEffects() {
+  effectsEnabled = !effectsEnabled;
+  saveEffectsEnabled();
+  shockwaves = [];
+  initBgParticles();
+  renderEffectsButton();
+}
+function getHudTop() { return Math.max(68, 54 * W / (canvas.clientWidth || W)); }
+function drawPlayerGlow() {
+  if (!effectsEnabled || state !== PLAYING) return;
+  const wave = (Math.sin(visualTime * 2.2) + 1) / 2;
+  const layer = (extra, alpha) => {
+    ctx.save();
+    // 光晕限制在 HUD 以下，避免覆盖分数与钱包文字。
+    const top = getHudTop() + 44;
+    ctx.beginPath(); ctx.rect(0, top, W, Math.max(0, H - top)); ctx.clip();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = currentSkin.playerFill;
+    roundedCard(player.x - extra / 2, player.y - extra / 2,
+      PLAYER_SIZE + extra, PLAYER_SIZE + extra, 9);
+    ctx.fill();
+    ctx.restore();
+  };
+  if (performanceLevel === 'high') layer(24, 0.04 + 0.06 * (Math.sin(visualTime * 2.2 + 1.2) + 1) / 2);
+  layer(10 + 6 * wave, 0.10 + 0.12 * wave);
+}
+function drawCoinEffects(coin) {
+  ctx.save();
+  const phase = coin.phase ?? 0;
+  const y = coin.y + (effectsEnabled ? Math.sin(visualTime * 3 + phase) * 3 : 0);
+  ctx.fillStyle = currentSkin.coinFill;
+  if (effectsEnabled && performanceLevel === 'high') {
+    ctx.globalAlpha = 0.12 + 0.13 * (Math.sin(visualTime * 3 + phase) + 1) / 2;
+    ctx.beginPath(); ctx.arc(coin.x, y, coin.r + 4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.arc(coin.x, y, coin.r, 0, Math.PI * 2); ctx.fill();
+  if (effectsEnabled) {
+    ctx.globalAlpha = 0.5 + 0.4 * (Math.sin(visualTime * 5 + phase) + 1) / 2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(coin.x, y, coin.r * 0.55, Math.PI, Math.PI * 1.5); ctx.stroke();
+  }
+  ctx.restore();
+}
+function spawnShockwave() {
+  if (!effectsEnabled || performanceLevel === 'low' || state !== PLAYING) return;
+  shockwaves.push({ x: player.x + PLAYER_SIZE / 2, y: player.y + PLAYER_SIZE / 2,
+    radius: 6, maxRadius: 70, life: 0.28, maxLife: 0.28, color: currentSkin.accentColor });
+  if (shockwaves.length > MAX_SHOCKWAVES) shockwaves.shift();
+}
+function updateShockwaves(dt) {
+  if (!effectsEnabled || performanceLevel === 'low' || state !== PLAYING) { shockwaves = []; return; }
+  for (const wave of shockwaves) {
+    wave.life -= dt;
+    const t = clamp(1 - wave.life / wave.maxLife, 0, 1);
+    wave.radius = 6 + (wave.maxRadius - 6) * t;
+  }
+  shockwaves = shockwaves.filter(wave => wave.life > 0);
+}
+function drawShockwaves() {
+  if (!effectsEnabled || performanceLevel === 'low' || state !== PLAYING) return;
+  ctx.save();
+  for (const wave of shockwaves) {
+    const t = clamp(1 - wave.life / wave.maxLife, 0, 1);
+    ctx.strokeStyle = wave.color;
+    ctx.lineWidth = 3 * (1 - t) + 1;
+    ctx.globalAlpha = (1 - t) * 0.6;
+    ctx.beginPath(); ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+function getBgLimit() {
+  const counts = { stars: 30, petals: 24, embers: 28, fireflies: 22 };
+  const factor = performanceLevel === 'medium' ? 0.5 : 1;
+  return Math.min(Math.floor(MAX_BG_PARTICLES * factor), Math.floor((counts[currentSkin.bgEffect] || 0) * factor));
+}
+function initBgParticles() {
+  bgParticles = [];
+  bgSpawnTime = 0;
+  bgStyle = currentSkin.id;
+  if (!effectsEnabled || performanceLevel === 'low') return;
+  const effect = currentSkin.bgEffect;
+  if (effect !== 'stars' && effect !== 'fireflies') return;
+  for (let i = 0; i < getBgLimit(); i++) {
+    bgParticles.push({ x: visualRandom(2, W - 2), y: effect === 'stars' ? visualRandom(2, H * 0.7) : visualRandom(2, H - 2),
+      r: effect === 'stars' ? visualRandom(1, 2) : 2, phase: visualRandom(0, Math.PI * 2),
+      vx: visualRandom(-20, 20), vy: visualRandom(-20, 20), bucket: null, index: i });
+  }
+}
+function directionSeed(bucket, index, salt) {
+  const value = Math.sin(bucket * 127.1 + index * 311.7 + salt * 74.7) * 43758.5453;
+  return (value - Math.floor(value)) * 40 - 20;
+}
+function updateBgParticles(dt) {
+  if (!effectsEnabled || performanceLevel === 'low') { bgParticles = []; bgSpawnTime = 0; return; }
+  if (bgStyle !== currentSkin.id) initBgParticles();
+  const effect = currentSkin.bgEffect;
+  const limit = getBgLimit();
+  if (bgParticles.length > limit) bgParticles.length = limit;
+  if (effect === 'grid' || effect === 'none' || effect === 'stars') return;
+  if (effect === 'petals' || effect === 'embers') {
+    const interval = effect === 'petals' ? 0.25 : 0.18;
+    bgSpawnTime += dt;
+    while (bgSpawnTime >= interval) {
+      bgSpawnTime -= interval;
+      if (bgParticles.length >= limit) continue;
+      const petals = effect === 'petals';
+      bgParticles.push({ x: visualRandom(4, W - 4), y: petals ? -10 : H + 10,
+        vx: visualRandom(petals ? -20 : -15, petals ? 20 : 15),
+        vy: petals ? visualRandom(40, 80) : -visualRandom(50, 110),
+        phase: visualRandom(0, Math.PI * 2), r: visualRandom(1, 2) });
+    }
+  }
+  for (const particle of bgParticles) {
+    if (effect === 'fireflies') {
+      const bucket = Math.floor(visualTime / 2 + particle.phase);
+      if (bucket !== particle.bucket) {
+        particle.bucket = bucket;
+        particle.vx = directionSeed(bucket, particle.index, 1);
+        particle.vy = directionSeed(bucket, particle.index, 2);
+      }
+      particle.x += particle.vx * dt; particle.y += particle.vy * dt;
+      if (particle.x < 2 || particle.x > W - 2) { particle.x = clamp(particle.x, 2, W - 2); particle.vx *= -1; }
+      if (particle.y < 2 || particle.y > H - 2) { particle.y = clamp(particle.y, 2, H - 2); particle.vy *= -1; }
+    } else {
+      particle.x += (particle.vx + Math.sin(visualTime * (effect === 'petals' ? 2 : 3) + particle.phase) * (effect === 'petals' ? 20 : 12)) * dt;
+      particle.y += particle.vy * dt;
+    }
+  }
+  // 顶部/底部 10px 为生成缓冲带；绘制仍严格裁剪在画布内。
+  bgParticles = bgParticles.filter(particle => particle.x >= 0 && particle.x <= W && particle.y >= -10 && particle.y <= H + 10);
+}
+function drawGridEffect() {
+  if (!effectsEnabled || performanceLevel === 'low' || currentSkin.bgEffect !== 'grid') return;
+  ctx.save();
+  ctx.strokeStyle = currentSkin.bgEffectColor;
+  ctx.globalAlpha = 0.1 + Math.sin(visualTime) * 0.02;
+  ctx.lineWidth = 1;
+  const offset = (visualTime * 20) % 60;
+  ctx.beginPath();
+  for (let x = offset; x <= W; x += 60) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = offset; y <= H; y += 60) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke();
+  ctx.restore();
+}
+function drawBgParticles() {
+  if (!effectsEnabled || performanceLevel === 'low') return;
+  if (currentSkin.bgEffect === 'grid') { drawGridEffect(); return; }
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  ctx.fillStyle = currentSkin.bgEffectColor;
+  for (const particle of bgParticles) {
+    if (particle.y < 0 || particle.y > H) continue;
+    const effect = currentSkin.bgEffect;
+    if (effect === 'stars') ctx.globalAlpha = 0.2 + 0.25 * (Math.sin(visualTime * 1.5 + particle.phase) + 1) / 2;
+    else if (effect === 'fireflies') ctx.globalAlpha = Math.min(0.45, 0.25 + 0.25 * (Math.sin(visualTime * 2 + particle.phase) + 1) / 2);
+    else ctx.globalAlpha = effect === 'petals' ? 0.35 : 0.4;
+    if (effect === 'petals') {
+      ctx.save(); ctx.translate(particle.x, particle.y); ctx.rotate(visualTime + particle.phase);
+      ctx.fillRect(-2, -2, 4, 4); ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+function evaluatePerformance(dt) {
+  if (!Number.isFinite(dt) || dt <= 0) return;
+  avgFrameTime = avgFrameTime * 0.95 + dt * 0.05;
+  performanceCheckTime += dt;
+  recoveryTime = avgFrameTime < 1 / 55 ? recoveryTime + dt : 0;
+  if (performanceCheckTime < 2) return;
+  performanceCheckTime %= 2;
+  const levels = ['low', 'medium', 'high'];
+  let index = levels.indexOf(performanceLevel);
+  const previous = index;
+  if (avgFrameTime > 1 / 40) index = Math.max(0, index - 1);
+  else if (recoveryTime >= 4) { index = Math.min(2, index + 1); recoveryTime = 0; }
+  if (index !== previous) {
+    performanceLevel = levels[index];
+    if (performanceLevel === 'low') shockwaves = [];
+    initBgParticles();
+  }
+}
+function updateVisualEffects(dt, frameTime = dt) {
+  visualTime += dt;
+  evaluatePerformance(frameTime);
+  if (!effectsEnabled) { shockwaves = []; bgParticles = []; bgSpawnTime = 0; return; }
+  updateShockwaves(dt);
+  updateBgParticles(dt);
 }
 
 function drawBackground() {
@@ -750,6 +972,7 @@ function drawGameOverCard() {
 function draw() {
   const skin = getCurrentSkin();
   drawBackground();
+  drawBgParticles();
   ctx.fillStyle = '#ef4444';
   ctx.fillRect(0, 0, W, 2);
   ctx.fillRect(0, H - 2, W, 2);
@@ -761,19 +984,17 @@ function draw() {
     ctx.strokeRect(platform.x + 1, platform.y + 1, platform.w - 2, platform.h - 2);
     drawSpikes(platform);
   }
-  ctx.fillStyle = skin.coinFill;
-  for (const coin of coins) {
-    ctx.beginPath();
-    ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  for (const coin of coins) drawCoinEffects(coin);
+  drawPlayerGlow();
   drawSkinPreview(ctx, skin, player.x, player.y, PLAYER_SIZE);
+  drawShockwaves();
+  drawParticles();
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   ctx.fillStyle = skin.accentColor;
   ctx.font = 'bold 18px ' + UI_FONT;
   // 为右上方 DOM 按钮组留出一行空间。
-  const hudTop = Math.max(68, 54 * W / (canvas.clientWidth || W));
+  const hudTop = getHudTop();
   ctx.fillText('分数: ' + score, 20, hudTop);
   if (combo >= 2) {
     const pulse = 1 + (Math.sin(gameTime * 6) + 1) * 0.03;
@@ -789,18 +1010,21 @@ function draw() {
   ctx.font = '14px ' + UI_FONT;
   ctx.fillText('最高: ' + best, W - 20, hudTop);
   ctx.fillText('金币: ' + wallet, W - 20, hudTop + 24);
-  drawParticles();
   if (state === READY) drawReadyCard();
   else if (state === GAME_OVER) drawGameOverCard();
 }
 
 // 所有 DOM 控件单独消费事件，避免触摸兼容事件触发画布操作。
-for (const id of ['sound-toggle', 'achievement-toggle', 'skin-toggle', 'achievement-panel', 'skin-panel']) {
+for (const id of ['sound-toggle', 'achievement-toggle', 'skin-toggle', 'effects-toggle', 'achievement-panel', 'skin-panel']) {
   const element = document.getElementById(id);
   for (const eventName of ['mousedown', 'touchstart']) {
     element.addEventListener(eventName, event => event.stopPropagation());
   }
 }
+document.getElementById('effects-toggle').addEventListener('click', event => {
+  event.stopPropagation();
+  toggleEffects();
+});
 document.getElementById('sound-toggle').addEventListener('click', event => {
   event.stopPropagation();
   toggleSound();
@@ -824,6 +1048,11 @@ document.getElementById('skin-panel').addEventListener('click', event => {
   if (event.target === event.currentTarget || event.target.closest('#close-skins')) setPanel(null);
 });
 window.addEventListener('keydown', event => {
+  if (event.code === 'KeyT' || event.key.toLowerCase() === 't') {
+    event.preventDefault();
+    if (!event.repeat) toggleEffects();
+    return;
+  }
   if (event.code === 'KeyM' || event.key.toLowerCase() === 'm') {
     event.preventDefault();
     if (!event.repeat) toggleSound();
@@ -882,14 +1111,18 @@ window.addEventListener('touchmove', event => {
 document.addEventListener('visibilitychange', () => { lastTime = null; });
 
 function loop(now) {
-  const dt = lastTime === null ? 0 : clamp((now - lastTime) / 1000, 0, MAX_DT);
+  const frameTime = lastTime === null ? 0 : Math.max(0, (now - lastTime) / 1000);
+  const dt = Math.min(frameTime, MAX_DT);
   lastTime = now;
   update(dt);
+  updateVisualEffects(dt, frameTime);
   draw();
   requestAnimationFrame(loop);
 }
 resetGame();
 state = READY;
+initBgParticles();
+renderEffectsButton();
 requestAnimationFrame(loop);
 </script>
 </body>
